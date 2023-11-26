@@ -5,10 +5,13 @@
 #include <string.h>
 #include <errno.h>
 #include <math.h>
-
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <pthread.h>
 #include <sys/ioctl.h>
 
 #include "vdrm_ioctl.h"
+#include"server.h"
 
 #define BUFFER_SIZE 16384+sizeof(struct ioctl_data) //2^14
 
@@ -24,6 +27,24 @@ int main() {
 	memset(buf, 0, BUFFER_SIZE);
 	struct ioctl_data *ioctl;
 	ssize_t byteRead = 0;
+
+
+    ServerParameters *params;
+
+    // Initialize server
+    params = initialize_server();
+    if (params->server_fd == -1) {
+        fprintf(stderr, "Failed to initialize server\n");
+        exit(1);
+    }
+
+    printf("Waiting for new connection...\n");
+    params->new_socket = accept(params->server_fd, (struct sockaddr *)&params->address, (socklen_t *)sizeof(params->address));
+    if (params->new_socket < 0) {
+        perror("accept");
+        exit(1);
+    }
+
 	while (1) {
 		printf("before read\n");
 		byteRead = read(fd, buf, BUFFER_SIZE);
@@ -46,5 +67,12 @@ int main() {
 		close(fd);
 		break;
 	}
+
+    // Close the client socket
+    close(params->new_socket);
+
+    // Cleanup resources
+    cleanup_server_parameters(params);
+
 	return EXIT_SUCCESS;
 }
